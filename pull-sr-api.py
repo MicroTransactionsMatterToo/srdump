@@ -1,18 +1,54 @@
+#! /usr/bin/env python
 import requests
 from threading import Thread, Event
 from queue import Queue
 import json
 import logging
 import time
+import argparse
 
-logging.basicConfig(level=logging.INFO, format='[%(relativeCreated)6d]:%(threadName)s >> %(message)s')
+# Argument Parsing
+parser = argparse.ArgumentParser()
 
-url_root = "https://www.speedrun.com/api/v1"
+parser.add_argument(
+    "-n",
+    "--num-of-threads",
+    action="store",
+    type=int,
+    default=4,
+    help="The number of threads to use, Speedrun.com has issues with anything more than 6"
+)
 
+parser.add_argument(
+    "-u",
+    "--url",
+    action="store",
+    type=str,
+    default="https://www.speedrun.com/api/v1",
+    help="API url to fetch from"
+)
+
+parser.add_argument(
+    "-q",
+    "--quiet",
+    action="store_true",
+    default=False,
+    help="Silence output"
+)
+
+args = parser.parse_args()
+
+if args.quiet:
+    logging.basicConfig(level=logging.ERROR, format='[%(relativeCreated)6d]:%(threadName)s >> %(message)s')
+else:
+    logging.basicConfig(level=logging.INFO, format='[%(relativeCreated)6d]:%(threadName)s >> %(message)s')
+
+
+
+url_root = args.url
 url_queue = Queue()
 api_results = Queue()
-
-num_workers = 6
+num_workers = args.num_of_threads
 done_flag = Event()
 
 
@@ -30,12 +66,12 @@ def add_pages(url_q, done: Event):
 
 def worker(url_q: Queue, api_q: Queue, done: Event):
     while True:
-        logging.info(f"Fetching API page: \b")
+        logging.info(f"Fetching new page")
         if url_q.empty():
             return
         url_info = url_q.get()
         logging.info(
-            f"{url_root}/runs?max={url_info['length']}&offset={url_info['offset']}&orderby=submitted&direction=asc"
+            f"Fetching Page: {url_root}/runs?max={url_info['length']}&offset={url_info['offset']}&orderby=submitted&direction=asc"
         )
         api_result = requests.get(
             f"{url_root}/runs?max={url_info['length']}&offset={url_info['offset']}&orderby=submitted&direction=asc"
